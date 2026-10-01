@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from aiogram import Bot, F, Router
@@ -19,7 +19,6 @@ from app.services import (
     export_bytes,
     find_operator,
     is_channel_member,
-    next_wednesday_window,
     participant_exists,
     record_attempt,
     recheck_membership,
@@ -122,19 +121,78 @@ def build_router(settings: Settings, session_factory: async_sessionmaker[AsyncSe
             await message.reply("این دستور باید داخل thread کامنت همان پست کانال ارسال شود.")
             return
         title = " ".join(_parts(message)[1:]).strip() or "AsanPanel Giveaway"
-        starts_at, ends_at = next_wednesday_window(settings.timezone)
         async with session_factory() as session:
             existing = await session.scalar(select(Giveaway.id).where(Giveaway.comment_chat_id == message.chat.id, Giveaway.message_thread_id == message.message_thread_id, Giveaway.status.in_([GiveawayStatus.IDLE, GiveawayStatus.ACTIVE])))
             if existing:
                 await message.reply(f"برای این thread یک Giveaway باز با شناسه {existing} وجود دارد.")
                 return
-            giveaway = Giveaway(title=title[:200], comment_chat_id=message.chat.id, message_thread_id=message.message_thread_id, starts_at=starts_at, ends_at=ends_at)
+            giveaway = Giveaway(
+                title=title[:200],
+                comment_chat_id=message.chat.id,
+                message_thread_id=message.message_thread_id,
+                schedule_confirmed=False,
+            )
             session.add(giveaway)
             await session.commit()
             await session.refresh(giveaway)
             await audit(session, message.from_user.id, "create_giveaway", giveaway.id, f"thread={message.message_thread_id}")
-        local_start = starts_at.astimezone(ZoneInfo(settings.timezone)).strftime("%Y-%m-%d %H:%M")
-        await message.reply(f"✅ Giveaway #{giveaway.id} ساخته شد و به همین thread قفل شد. شروع خودکار: {local_start} (تهران).\nبرای شروع دستی در چت خصوصی: /start_giveaway {giveaway.id}")
+        await message.reply(
+            f"✅ Giveaway #{giveaway.id} به‌صورت پیش‌نویس ساخته و به همین کامنت قفل شد.\n"
+            "هیچ زمان‌بندی هنوز فعال نیست. در چت خصوصی Bot ابتدا زمان را با "
+            f"/schedule_giveaway {giveaway.id} 2026-10-07 18:00 2026-10-07 20:00 تعیین کنید، "
+            f"سپس با /confirm_schedule {giveaway.id} تأیید کنید."
+        )
+
+    @router.message(Command("schedule_giveaway"), F.chat.type == "private")
+    async def schedule_giveaway(message: Message) -> None:
+        if not _is_admin(message, settings):
+            return
+        tokens = (message.text or "").split()
+        if len(tokens) != 6 or not tokens[1].isdigit():
+            await message.answer("استفاده: /schedule_giveaway <id> YYYY-MM-DD HH:MM YYYY-MM-DD HH:MM\nزمان‌ها به وقت تهران هستند.")
+            return
+        try:
+            timezone = ZoneInfo(settings.timezone)
+            starts_at = datetime.strptime(f"{tokens[2]} {tokens[3]}", "%Y-%m-%d %H:%M").replace(tzinfo=timezone).astimezone(UTC)
+            ends_at = datetime.strptime(f"{tokens[4]} {tokens[5]}", "%Y-%m-%d %H:%M").replace(tzinfo=timezone).astimezone(UTC)
+        except ValueError:
+            await message.answer("فرمت تاریخ یا ساعت صحیح نیست.")
+            return
+        if starts_at <= utcnow() or ends_at <= starts_at:
+            await message.answer("زمان شروع باید در آینده و زمان پایان بعد از شروع باشد.")
+            return
+        async with session_factory() as session:
+            giveaway = await session.get(Giveaway, int(tokens[1]))
+            if giveaway is None or giveaway.status != GiveawayStatus.IDLE:
+                await message.answer("فقط Giveaway پیش‌نویس (IDLE) قابل زمان‌بندی است.")
+                return
+            giveaway.starts_at = starts_at
+            giveaway.ends_at = ends_at
+            giveaway.schedule_confirmed = False
+            await session.commit()
+            await audit(session, message.from_user.id, "set_schedule", giveaway.id, f"{starts_at.isoformat()} to {ends_at.isoformat()}")
+        await message.answer("✅ زمان ذخیره شد، اما هنوز فعال نیست. جزئیات را بررسی و سپس /confirm_schedule <id> را اجرا کنید.")
+
+    @router.message(Command("confirm_schedule"), F.chat.type == "private")
+    async def confirm_schedule(message: Message) -> None:
+        if not _is_admin(message, settings):
+            return
+        parts = _parts(message)
+        if len(parts) < 2 or not parts[1].isdigit():
+            await message.answer("استفاده: /confirm_schedule <id>")
+            return
+        async with session_factory() as session:
+            giveaway = await session.get(Giveaway, int(parts[1]))
+            if giveaway is None or giveaway.status != GiveawayStatus.IDLE or not giveaway.starts_at or not giveaway.ends_at:
+                await message.answer("ابتدا یک Giveaway پیش‌نویس با زمان شروع و پایان معتبر بسازید.")
+                return
+            if giveaway.starts_at <= utcnow() or giveaway.ends_at <= giveaway.starts_at:
+                await message.answer("بازه زمان دیگر معتبر نیست؛ دوباره زمان‌بندی کنید.")
+                return
+            giveaway.schedule_confirmed = True
+            await session.commit()
+            await audit(session, message.from_user.id, "confirm_schedule", giveaway.id)
+        await message.answer("✅ زمان‌بندی تأیید شد. Bot فقط در زمان تعیین‌شده آن را فعال و در پایان آن را می‌بندد.")
 
     @router.message(Command("start_giveaway"), F.chat.type == "private")
     async def start_giveaway(message: Message) -> None:
@@ -152,6 +210,7 @@ def build_router(settings: Settings, session_factory: async_sessionmaker[AsyncSe
             giveaway.status = GiveawayStatus.ACTIVE
             giveaway.starts_at = utcnow()
             giveaway.ends_at = utcnow() + timedelta(hours=2)
+            giveaway.schedule_confirmed = False
             await session.commit()
             await audit(session, message.from_user.id, "manual_start", giveaway.id)
         await message.answer("✅ Giveaway فعال شد و دو ساعت دیگر به‌صورت خودکار بسته می‌شود.")
@@ -199,13 +258,11 @@ def build_router(settings: Settings, session_factory: async_sessionmaker[AsyncSe
             if replacement_exists:
                 await message.answer(f"برای این thread Giveaway باز #{replacement_exists} وجود دارد.")
                 return
-            starts_at, ends_at = next_wednesday_window(settings.timezone)
             replacement = Giveaway(
                 title=previous.title,
                 comment_chat_id=previous.comment_chat_id,
                 message_thread_id=previous.message_thread_id,
-                starts_at=starts_at,
-                ends_at=ends_at,
+                schedule_confirmed=False,
             )
             session.add(replacement)
             await session.commit()

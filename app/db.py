@@ -1,3 +1,4 @@
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import Settings
@@ -18,4 +19,7 @@ async def create_schema(session_factory: async_sessionmaker[AsyncSession]) -> No
     engine = session_factory.kw["bind"]
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)
-
+        # Compatible bootstrap migration for installations created before scheduling confirmation.
+        await connection.execute(
+            text("ALTER TABLE giveaways ADD COLUMN IF NOT EXISTS schedule_confirmed BOOLEAN NOT NULL DEFAULT FALSE")
+        )

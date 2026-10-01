@@ -103,6 +103,7 @@ async def start_due(session_factory: async_sessionmaker[AsyncSession]) -> int:
             update(Giveaway)
             .where(
                 Giveaway.status == GiveawayStatus.IDLE,
+                Giveaway.schedule_confirmed.is_(True),
                 Giveaway.starts_at <= now,
                 Giveaway.ends_at > now,
             )
