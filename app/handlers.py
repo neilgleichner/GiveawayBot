@@ -41,6 +41,32 @@ def _parts(message: Message) -> list[str]:
 def build_router(settings: Settings, session_factory: async_sessionmaker[AsyncSession], limiter: RateLimiter) -> Router:
     router = Router(name="giveaway")
 
+    @router.message(Command("start", "help"), F.chat.type == "private")
+    async def start_help(message: Message) -> None:
+        if _is_admin(message, settings):
+            await message.answer(
+                "ربات Giveaway آسان‌پنل فعال است.\n\n"
+                "برای تست سریع:\n"
+                "1. در کامنت پست: /whereami سپس /new_giveaway تست\n"
+                "2. در همین چت خصوصی: /start_giveaway <id>\n\n"
+                "برای زمان‌بندی: /schedule_giveaway <id> YYYY-MM-DD HH:MM YYYY-MM-DD HH:MM\n"
+                "و سپس: /confirm_schedule <id>"
+            )
+        else:
+            await message.answer("این ربات فقط برای مدیریت قرعه‌کشی آسان‌پنل استفاده می‌شود.")
+
+    @router.message(Command("whoami"))
+    async def whoami(message: Message) -> None:
+        """Safe diagnostic: reveals only the caller's own Telegram and current chat IDs."""
+        if message.from_user is None:
+            return
+        admin_status = "بله" if _is_admin(message, settings) else "خیر"
+        await message.reply(
+            f"Your Telegram User ID: {message.from_user.id}\n"
+            f"Current Chat ID: {message.chat.id}\n"
+            f"Is configured admin: {admin_status}"
+        )
+
     @router.message(Command("whereami"))
     async def whereami(message: Message) -> None:
         """Private diagnostic for binding the configured discussion group and its post thread."""

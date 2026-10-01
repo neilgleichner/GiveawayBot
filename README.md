@@ -15,7 +15,7 @@ The container deliberately uses long polling: no inbound HTTP port is exposed. I
 
 ## Admin commands (private chat only)
 
-`/whereami`, `/new_giveaway [title]`, `/schedule_giveaway <id> YYYY-MM-DD HH:MM YYYY-MM-DD HH:MM`, `/confirm_schedule <id>`, `/start_giveaway <id>`, `/close_giveaway <id>` (یا `/stop_giveaway`)، `/reset_giveaway <id>`, `/status <id>`, `/stats <id>`, `/export <id> ids|eligible|participants`, `/recheck_membership <id>`, `/remove_eligibility <giveaway_id> <user_id> <reason>`, `/draw <id>`, `/history`, `/operators`, `/operator_add <name>`, `/operator_rename <operator_id> <name>`, `/operator_alias_add <operator_id> <alias>`, `/operator_alias_remove <alias_id>`, `/operator_disable <operator_id>`.
+`/start`, `/help`, `/whoami`, `/whereami`, `/new_giveaway [title]`, `/schedule_giveaway <id> YYYY-MM-DD HH:MM YYYY-MM-DD HH:MM`, `/confirm_schedule <id>`, `/start_giveaway <id>`, `/close_giveaway <id>` (یا `/stop_giveaway`)، `/reset_giveaway <id>`, `/status <id>`, `/stats <id>`, `/export <id> ids|eligible|participants`, `/recheck_membership <id>`, `/remove_eligibility <giveaway_id> <user_id> <reason>`, `/draw <id>`, `/history`, `/operators`, `/operator_add <name>`, `/operator_rename <operator_id> <name>`, `/operator_alias_add <operator_id> <alias>`, `/operator_alias_remove <alias_id>`, `/operator_disable <operator_id>`.
 
 `/new_giveaway` must be sent in the designated comment group and in the intended discussion thread. It binds that thread permanently to the giveaway.
 
