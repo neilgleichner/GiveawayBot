@@ -41,6 +41,16 @@ def _parts(message: Message) -> list[str]:
 def build_router(settings: Settings, session_factory: async_sessionmaker[AsyncSession], limiter: RateLimiter) -> Router:
     router = Router(name="giveaway")
 
+    @router.message(Command("whereami"))
+    async def whereami(message: Message) -> None:
+        """Private diagnostic for binding the configured discussion group and its post thread."""
+        if not _is_admin(message, settings):
+            return
+        await message.reply(
+            f"Chat ID: {message.chat.id}\n"
+            f"Thread ID: {message.message_thread_id or 'ندارد (داخل کامنت یک پست کانال اجرا کنید)'}"
+        )
+
     @router.message(F.chat.id == settings.comment_chat_id, F.text, ~F.text.startswith("/"), ~F.via_bot)
     async def participant_message(message: Message, bot: Bot) -> None:
         if message.from_user is None or message.from_user.is_bot or not message.text:

@@ -9,11 +9,13 @@ Secure Telegram bot for weekly giveaways. Participants are identified only by Te
 3. Start the private stack: `docker compose up -d --build`.
 4. In the exact discussion thread for a channel post, run `/new_giveaway`. It creates a non-scheduled draft only. In your private chat with the bot, set its time with `/schedule_giveaway <id> YYYY-MM-DD HH:MM YYYY-MM-DD HH:MM` and explicitly arm it with `/confirm_schedule <id>`.
 
+For a private test channel, put its numeric ID (for example `-100...`) in `CHANNEL_USERNAME`; Bot API accepts either a public `@username` or a numeric private-channel ID. Run `/whereami` as an admin in the linked discussion group to get the exact `COMMENT_CHAT_ID` safely.
+
 The container deliberately uses long polling: no inbound HTTP port is exposed. It is a good default for a single VPS. If switching to webhooks later, place the application behind Nginx, HTTPS, Telegram webhook secret verification, and an IP/firewall policy.
 
 ## Admin commands (private chat only)
 
-`/new_giveaway [title]`, `/schedule_giveaway <id> YYYY-MM-DD HH:MM YYYY-MM-DD HH:MM`, `/confirm_schedule <id>`, `/start_giveaway <id>`, `/close_giveaway <id>` (یا `/stop_giveaway`)، `/reset_giveaway <id>`, `/status <id>`, `/stats <id>`, `/export <id> ids|eligible|participants`, `/recheck_membership <id>`, `/remove_eligibility <giveaway_id> <user_id> <reason>`, `/draw <id>`, `/history`, `/operators`, `/operator_add <name>`, `/operator_rename <operator_id> <name>`, `/operator_alias_add <operator_id> <alias>`, `/operator_alias_remove <alias_id>`, `/operator_disable <operator_id>`.
+`/whereami`, `/new_giveaway [title]`, `/schedule_giveaway <id> YYYY-MM-DD HH:MM YYYY-MM-DD HH:MM`, `/confirm_schedule <id>`, `/start_giveaway <id>`, `/close_giveaway <id>` (یا `/stop_giveaway`)، `/reset_giveaway <id>`, `/status <id>`, `/stats <id>`, `/export <id> ids|eligible|participants`, `/recheck_membership <id>`, `/remove_eligibility <giveaway_id> <user_id> <reason>`, `/draw <id>`, `/history`, `/operators`, `/operator_add <name>`, `/operator_rename <operator_id> <name>`, `/operator_alias_add <operator_id> <alias>`, `/operator_alias_remove <alias_id>`, `/operator_disable <operator_id>`.
 
 `/new_giveaway` must be sent in the designated comment group and in the intended discussion thread. It binds that thread permanently to the giveaway.
 
