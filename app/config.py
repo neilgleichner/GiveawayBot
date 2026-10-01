@@ -20,13 +20,15 @@ class Settings(BaseSettings):
 
     @field_validator("admin_telegram_ids", mode="before")
     @classmethod
-    def parse_admin_ids(cls, value: str | set[int]) -> set[int]:
-        if isinstance(value, set):
-            return value
+    def parse_admin_ids(cls, value: str | int | set[int] | list[int]) -> set[int]:
+        """Accept a single ID or a comma-separated allowlist from .env."""
+        if isinstance(value, int):
+            return {value}
+        if isinstance(value, (set, list)):
+            return {int(item) for item in value}
         return {int(item.strip()) for item in value.split(",") if item.strip()}
 
 
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-
